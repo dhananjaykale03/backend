@@ -1,12 +1,10 @@
-// backend/routes/contactRoutes.js
 import express from "express";
 import dotenv from "dotenv";
 import Message from "../models/Message.js";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
 dotenv.config();
 const router = express.Router();
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 router.post("/", async (req, res) => {
     try {
@@ -22,15 +20,30 @@ router.post("/", async (req, res) => {
         await newMessage.save();
         console.log("✅ Message saved to MongoDB");
 
-        // Send email using Resend API
-        const data = await resend.emails.send({
-            from: "Portfolio Contact <onboarding@resend.dev>", // Resend-approved sender
-            to: process.env.RECEIVER_EMAIL,
-            subject: `New Contact Message from ${name}`,
-            text: `Name: ${name}\nEmail: ${email}\nMessage: ${message}`,
+        // Setup mail transport
+        const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS,
+            },
         });
 
-        console.log("✅ Email sent via Resend:", data);
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: process.env.RECEIVER_EMAIL || process.env.EMAIL_USER,
+            subject: `New Contact Message from ${name}`,
+            text: `
+Name: ${name}
+Email: ${email}
+Message: ${message}
+      `,
+        };
+
+        console.log("📤 Sending email...");
+        const info = await transporter.sendMail(mailOptions);
+        console.log("✅ Email sent:", info.response);
+
         res.status(200).json({ success: true, message: "Message sent successfully!" });
     } catch (error) {
         console.error("❌ Email send failed:", error);
